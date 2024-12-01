@@ -1,35 +1,48 @@
-import React from 'react';
-import { Button, StyleSheet, View, Text } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
+import React, { useState } from 'react';
+import { Button, Text, View, FlatList, StyleSheet } from 'react-native';
 
-const STRAVA_BASE_URL = 'https://www.strava.com/oauth';
-const CLIENT_ID = '141532'; // Tu Client ID de Strava
-const CLIENT_SECRET = '9b4b4265aa2c40d4ce83be893d9a97b091b3abe5'; // Tu Client Secret de Strava
-const REDIRECT_URI = AuthSession.makeRedirectUri(); // URL de redirección generada por Expo
-const SCOPES = 'read'; // Alcance de permisos requeridos
+const ACCESS_TOKEN = '6a3a779f181c649021aae02a8c66096ac6d6d0f1'; // Token de acceso estático
 
 export default function App() {
-  const [authCode, setAuthCode] = React.useState<string | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const authenticateWithStrava = async () => {
-    const authUrl = `${STRAVA_BASE_URL}/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPES}`;
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
-
-    if (result.type === 'success' && result.url) {
-      const params = new URLSearchParams(result.url.split('?')[1]);
-      const code = params.get('code');
-      setAuthCode(code); // Guarda el código de autorización
-      console.log('Authorization code:', code);
-    } else {
-      console.error('Autenticación fallida:', result);
+  // Función para obtener actividades del usuario
+  const getActivities = async () => {
+    try {
+      const response = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=10', {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+      });
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setActivities(data); // Guardar actividades en el estado
+      } else {
+        setError('No se pudieron obtener actividades.');
+      }
+    } catch (err) {
+      console.error('Error obteniendo actividades:', err);
+      setError('Error obteniendo actividades.');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Button title="Iniciar sesión con Strava" onPress={authenticateWithStrava} />
-      {authCode && <Text>Authorization code: {authCode}</Text>}
+      <Button title="Obtener Actividades" onPress={getActivities} />
+      {error && <Text style={styles.error}>{error}</Text>}
+      <FlatList
+        data={activities}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.title}>Nombre: {item.name}</Text>
+            <Text>Distancia: {item.distance} metros</Text>
+            <Text>Tiempo: {item.moving_time} segundos</Text>
+            <Text>Elevación: {item.total_elevation_gain} metros</Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
@@ -37,8 +50,27 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f8f9fa',
+  },
+  card: {
+    padding: 15,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  error: {
+    color: 'red',
+    marginBottom: 10,
   },
 });
